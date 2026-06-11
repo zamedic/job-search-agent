@@ -34,8 +34,18 @@ html, body {
 body {
   display: grid;
   grid-template-columns: 260px 1fr;
+  /* 100vh is the *largest* viewport (URL bar hidden). On mobile
+     that's larger than what's actually visible when the bar is
+     showing, which pushes the composer off-screen. 100dvh
+     (dynamic viewport height) tracks the actual visible viewport
+     as the bar shows/hides. The 100vh line stays as a fallback
+     for older browsers that don't support dvh. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
+  /* Prevent the page from being able to scroll horizontally on
+     mobile when content is exactly at the edge. */
+  overscroll-behavior: none;
 }
 
 /* ----- Sidebar ----- */
@@ -321,7 +331,14 @@ button.primary:hover { background: var(--accent-2); }
 #composer {
   border-top: 1px solid var(--border);
   background: var(--surface);
-  padding: 12px 24px 16px 24px;
+  /* Horizontal padding stays roomy on desktop; right and bottom get
+     reduced on mobile so the textarea + Send button use the full
+     width. env(safe-area-inset-*) handles iOS notch / home
+     indicator. */
+  padding: 12px 16px 16px 16px;
+  /* Tell mobile Safari the composer area shouldn't be obscured by
+     the bottom toolbar / home indicator. */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
 }
 #send-form {
   display: flex;
