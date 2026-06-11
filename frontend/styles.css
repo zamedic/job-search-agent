@@ -180,13 +180,55 @@ button.primary:hover { background: var(--accent-2); }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   background: var(--surface);
 }
 #chat-header h1 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+/* Hamburger button — three bars stacked. Hidden on desktop,
+   shown on mobile (≤720px). */
+.hamburger {
+  display: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.hamburger .bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 1px;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+/* When the sidebar is open, the hamburger morphs into an X. */
+.hamburger.open .bar:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.hamburger.open .bar:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.open .bar:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
 #chat-header .actions button {
   margin-left: 6px;
   padding: 4px 10px;
@@ -380,8 +422,53 @@ button.primary:hover { background: var(--accent-2); }
 }
 #status-line.error { color: var(--error); }
 
-/* ----- Mobile-ish: collapse sidebar on small screens ----- */
+/* ----- Mobile: sidebar slides in as an overlay ----- */
 @media (max-width: 720px) {
   body { grid-template-columns: 1fr; }
-  #sidebar { display: none; }
+
+  /* The sidebar leaves the grid layout and becomes a fixed overlay
+     sliding in from the left. Off-screen by default; toggled via
+     the .open class added/removed by app.js. */
+  #sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(280px, 85vw);
+    height: 100dvh;
+    height: 100vh; /* fallback */
+    z-index: 100;
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    background: var(--surface);
+    /* Override the desktop `display: flex` — when the overlay is
+       closed, hide it so it doesn't trap focus. */
+    display: flex;
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* The backdrop sits behind the sidebar but above the chat.
+     app.js appends a #backdrop element to the body when the
+     sidebar opens. */
+  #backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  #backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .hamburger { display: flex; }
+
+  /* Header padding slightly tighter on mobile so the title gets more
+     room next to the hamburger + actions. */
+  #chat-header { padding: 12px 16px; }
 }

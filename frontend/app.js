@@ -299,6 +299,12 @@ async function openSession(id) {
     state.inFlight.abort();
     state.inFlight = null;
   }
+
+  // On mobile, opening a session from the sidebar should also
+  // dismiss the overlay so the user sees the chat.
+  if ($("sidebar").classList.contains("open")) {
+    closeSidebar();
+  }
   state.currentSessionId = id;
   const s = await loadSession(id);
   $("chat-title").textContent = s.title;
@@ -485,11 +491,44 @@ async function checkHealth() {
 }
 
 // ----------------------------------------------------------------------
+// Mobile sidebar (hamburger menu)
+// ----------------------------------------------------------------------
+let _backdropEl = null;
+
+function openSidebar() {
+  $("sidebar").classList.add("open");
+  $("menu-toggle").classList.add("open");
+  $("menu-toggle").setAttribute("aria-label", "Close past research");
+  if (!_backdropEl) {
+    _backdropEl = document.createElement("div");
+    _backdropEl.id = "backdrop";
+    document.body.appendChild(_backdropEl);
+    _backdropEl.addEventListener("click", closeSidebar);
+  }
+  // Force a reflow before adding .open so the transition fires.
+  void _backdropEl.offsetWidth;
+  _backdropEl.classList.add("open");
+}
+
+function closeSidebar() {
+  $("sidebar").classList.remove("open");
+  $("menu-toggle").classList.remove("open");
+  $("menu-toggle").setAttribute("aria-label", "Show past research");
+  if (_backdropEl) _backdropEl.classList.remove("open");
+}
+
+function toggleSidebar() {
+  if ($("sidebar").classList.contains("open")) closeSidebar();
+  else openSidebar();
+}
+
+// ----------------------------------------------------------------------
 // Wire up
 // ----------------------------------------------------------------------
 window.addEventListener("DOMContentLoaded", () => {
   $("new-session").onclick = createSession;
   $("rename").onclick = renameCurrentSession;
+  $("menu-toggle").onclick = toggleSidebar;
 
   // Add a delete button next to rename.
   const delBtn = document.createElement("button");
@@ -520,6 +559,13 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
   input.addEventListener("input", autoSizeInput);
+
+  // Esc closes the mobile sidebar.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("sidebar").classList.contains("open")) {
+      closeSidebar();
+    }
+  });
 
   function autoSizeInput() {
     input.style.height = "auto";
