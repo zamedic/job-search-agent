@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Project
+data/sessions/
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build, Push and Deploy
+    runs-on: [self-hosted, labradoc, job-search-agent]
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tag
+        id: image
+        run: echo "sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        run: |
+          docker build -t ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }} .
+          docker tag ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }} ghcr.io/zamedic/job-search-agent:latest
+          docker push ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }}
+          docker push ghcr.io/zamedic/job-search-agent:latest
+
+      - name: Apply manifests
+        # First-time install + ongoing reconciliation. Idempotent — applies
+        # middleware, rbac, pvc, service, deployment, ingress.
+        run: kubectl apply -k k8s/
+
+      - name: Rollout image
+        # Force the deployment to pick up the new image even if the
+        # manifest tag didn't change (k8s won't auto-roll on tag reuse).
+        run: |
+          kubectl set image deployment/job-search-agent app=ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }} -n marcarndt
+          kubectl rollout status deployment/job-search-agent -n marcarndt --timeout=120s
+
+      - name: Verify
+        run: |
+          echo "=== pods ==="
+          kubectl get pods -n marcarndt -l app=job-search-agent
+          echo "=== ingress ==="
+          kubectl get ingress -n marcarndt job-search-agent
+          echo "=== health probe ==="
+          # The Traefik strip middleware forwards /api/health to /api/health
+          # on the backend. Hit the public URL to confirm end-to-end.
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" https://marcarndt.com/job-search-agent/api/health)
+            if [ "$code" = "200" ]; then
+              echo "health OK: HTTP $code"
+              exit 0
+            fi
+            echo "attempt $i: HTTP $code, retrying in 5s"
+            sleep 5
+          done
+          echo "health check failed"
+          exit 1

@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-search-agent
+  namespace: marcarndt
+  labels:
+    app: job-search-agent
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: job-search-agent
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: job-search-agent
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/zamedic/job-search-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: MINIMAX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: job-search-agent-secrets
+                  key: minimax-api-key
+            - name: JOB_MODEL
+              value: MiniMax-M3
+            - name: JOBAGENT_DATA_DIR
+              value: /data/sessions
+            - name: LOG_LEVEL
+              value: INFO
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: sessions
+              mountPath: /data/sessions
+      volumes:
+        - name: sessions
+          persistentVolumeClaim:
+            claimName: job-search-agent-sessions

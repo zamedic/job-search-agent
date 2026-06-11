@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: marcarndt
+
+# Apply order: middleware first (the ingress depends on it), then
+# rbac+pvc+service+deployment, then ingress last.
+resources:
+  - middleware.yaml
+  - rbac-role.yaml
+  - rbac-binding.yaml
+  - pvc.yaml
+  - service.yaml
+  - deployment.yaml
+  - ingress.yaml

@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: job-search-agent
+  namespace: marcarndt
+  annotations:
+    # Strip the /job-search-agent prefix before forwarding to the backend.
+    # Without this, the FastAPI app would see /job-search-agent/api/... and
+    # the SPA's relative fetch() calls would all 404.
+    traefik.ingress.kubernetes.io/router.middlewares: marcarndt-job-search-agent-strip@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: marcarndt.com
+      http:
+        paths:
+          - path: /job-search-agent
+            pathType: Prefix
+            backend:
+              service:
+                name: job-search-agent
+                port:
+                  number: 80
+    - host: www.marcarndt.com
+      http:
+        paths:
+          - path: /job-search-agent
+            pathType: Prefix
+            backend:
+              service:
+                name: job-search-agent
+                port:
+                  number: 80
+  # Reuse the existing wildcard cert for marcarndt.com — already issued
+  # by cert-manager (letsencrypt-prod) and shared with the marcarndt-web
+  # and riffbird-kanban ingresses in this namespace.
+  tls:
+    - hosts:
+        - marcarndt.com
+        - www.marcarndt.com
+      secretName: marcarndt-tls

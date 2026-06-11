@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobScope — Job Market Research Agent</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <header>
+      <div class="brand">
+        <span class="logo">⌕</span>
+        <span class="name">JobScope</span>
+      </div>
+      <button id="new-session" class="primary">+ New research</button>
+    </header>
+    <nav id="session-list" aria-label="Past research sessions"></nav>
+    <footer>
+      <span id="health" class="dot" title="Server status"></span>
+      <span id="model-name"></span>
+    </footer>
+  </aside>
+
+  <main id="chat">
+    <header id="chat-header">
+      <h1 id="chat-title">New research</h1>
+      <div class="actions">
+        <button id="rename" title="Rename">✎</button>
+        <button id="export" title="Export as HTML">⇩ Export</button>
+      </div>
+    </header>
+
+    <section id="messages" aria-live="polite">
+      <div class="welcome" id="welcome">
+        <h2>What role are you trying to fill?</h2>
+        <p>Tell me about a role and a location, and I'll research the market for you.</p>
+        <p class="hint">Example: <em>"I need to hire a senior backend engineer in Berlin, hybrid, Go and Kubernetes."</em></p>
+      </div>
+    </section>
+
+    <section id="composer">
+      <form id="send-form" autocomplete="off">
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="Describe the role you're trying to fill…"
+          required></textarea>
+        <button type="submit" id="send-btn">Send</button>
+      </form>
+      <div id="status-line" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

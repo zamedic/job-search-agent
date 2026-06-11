@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-search-agent
+  namespace: marcarndt
+  labels:
+    app: job-search-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: job-search-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

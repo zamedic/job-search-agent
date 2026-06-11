@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: job-search-agent-deployer-binding
+  namespace: marcarndt
+subjects:
+  - kind: ServiceAccount
+    name: actions-runner
+    namespace: actions-runner-system
+roleRef:
+  kind: Role
+  name: job-search-agent-deployer
+  apiGroup: rbac.authorization.k8s.io

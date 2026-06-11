@@ -1,0 +1,40 @@
+---
+# Lets the GitHub Actions runner (in actions-runner-system namespace,
+# serviceaccount `actions-runner`) deploy the job-search-agent
+# application into the marcarndt namespace.
+#
+# Mirrors the role in the `default` namespace (actions-runner-deployment-admin)
+# but expanded to include create/delete so the runner can run `kubectl
+# apply -f k8s/` from scratch instead of only `kubectl set image`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: job-search-agent-deployer
+  namespace: marcarndt
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["traefik.io"]
+    resources: ["middlewares"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: job-search-agent-deployer-binding
+  namespace: marcarndt
+subjects:
+  - kind: ServiceAccount
+    name: actions-runner
+    namespace: actions-runner-system
+roleRef:
+  kind: Role
+  name: job-search-agent-deployer
+  apiGroup: rbac.authorization.k8s.io
