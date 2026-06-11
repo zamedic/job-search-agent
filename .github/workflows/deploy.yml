@@ -44,6 +44,14 @@ jobs:
           docker push ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }}
           docker push ghcr.io/zamedic/job-search-agent:latest
 
+      - name: Apply RBAC first
+        # The runner needs secrets access to upsert the API key. Apply
+        # the role + binding explicitly before anything else so this
+        # step doesn't depend on the secret step succeeding.
+        run: |
+          kubectl apply -f k8s/rbac-role.yaml
+          kubectl apply -f k8s/rbac-binding.yaml
+
       - name: Ensure MiniMax API key secret exists in marcarndt namespace
         # Reads the API key from the repo's GitHub Actions secrets and
         # upserts it as a k8s secret in the marcarndt namespace. The
@@ -62,9 +70,9 @@ jobs:
             --from-literal=minimax-api-key="$MINIMAX_API_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Apply manifests
-        # First-time install + ongoing reconciliation. Idempotent — applies
-        # middleware, rbac, pvc, service, deployment, ingress.
+      - name: Apply remaining manifests
+        # Deployment, service, PVC, middleware, ingress. RBAC was applied
+        # in the previous step; the secret was just upserted above.
         run: kubectl apply -k k8s/
 
       - name: Rollout image
