@@ -156,7 +156,13 @@ function renderMarkdown(md) {
 // API helpers
 // ----------------------------------------------------------------------
 async function api(path, opts = {}) {
-  const res = await fetch(path, {
+  // Use a relative URL so the request goes to wherever the SPA is
+  // mounted (e.g. /job-search-agent/api/sessions on a path-prefixed
+  // deploy, or /api/sessions at the domain root).
+  // Stripping the leading slash is what makes it relative — the
+  // browser resolves it against the current page's path.
+  const url = path.startsWith("/") ? path.slice(1) : path;
+  const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...opts,
   });
@@ -320,7 +326,7 @@ async function sendMessage(text) {
   state.inFlight = controller;
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch("api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: state.currentSessionId, message: text }),
