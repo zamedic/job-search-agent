@@ -146,6 +146,105 @@ CHAT_TURN_2 = build_chat_stream([
     ("message_stop", {"type": "message_stop"}),
 ])
 
+# Phase 3 turn: model does 2 web searches, then emits a candidate profile.
+# Scripted: first call uses web_search, second call emits the final text.
+CHAT_TURN_3 = build_chat_stream([
+    ("message_start", {
+        "type": "message_start",
+        "message": {"id": "msg3", "type": "message", "role": "assistant",
+                    "content": [], "model": "MiniMax-M3",
+                    "stop_reason": None, "stop_sequence": None,
+                    "usage": {"input_tokens": 500, "output_tokens": 0}}
+    }),
+    ("content_block_start", {
+        "type": "content_block_start", "index": 0,
+        "content_block": {"type": "tool_use", "id": "toolu_3a",
+                          "name": "web_search", "input": {}}
+    }),
+    ("content_block_delta", {
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "input_json_delta",
+                  "partial_json": json.dumps({"query": "common reasons senior backend engineer leave current job 2026"})}
+    }),
+    ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+    ("content_block_start", {
+        "type": "content_block_start", "index": 1,
+        "content_block": {"type": "tool_use", "id": "toolu_3b",
+                          "name": "web_search", "input": {}}
+    }),
+    ("content_block_delta", {
+        "type": "content_block_delta", "index": 1,
+        "delta": {"type": "input_json_delta",
+                  "partial_json": json.dumps({"query": "senior engineer interview motivators 2026 hiring market"})}
+    }),
+    ("content_block_stop", {"type": "content_block_stop", "index": 1}),
+    ("message_delta", {
+        "type": "message_delta",
+        "delta": {"stop_reason": "tool_use"},
+        "usage": {"input_tokens": 500, "output_tokens": 60}
+    }),
+    ("message_stop", {"type": "message_stop"}),
+])
+
+# Phase 3 final turn: model emits the candidate personality profile.
+CHAT_TURN_4 = build_chat_stream([
+    ("message_start", {
+        "type": "message_start",
+        "message": {"id": "msg4", "type": "message", "role": "assistant",
+                    "content": [], "model": "MiniMax-M3",
+                    "stop_reason": None, "stop_sequence": None,
+                    "usage": {"input_tokens": 800, "output_tokens": 0}}
+    }),
+    ("content_block_start", {
+        "type": "content_block_start", "index": 0,
+        "content_block": {"type": "text", "text": ""}
+    }),
+    ("content_block_delta", {
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "text_delta",
+                  "text": "## Candidate Personality Profile\n\n"
+                          "1. **Stagnation-driven** — senior engineers who have stopped learning...\n"
+                          "2. **Comp-blocked** — high performers underpaid at their current role...\n"
+                          "3. **Remote-priority** — value location flexibility above comp...\n\n"
+                          "## Anti-personas\n- Junior devs (not senior enough)...\n\n"
+                          "Want me to proceed to the JDs?"}
+    }),
+    ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+    ("message_delta", {
+        "type": "message_delta",
+        "delta": {"stop_reason": "end_turn"},
+        "usage": {"input_tokens": 800, "output_tokens": 200}
+    }),
+    ("message_stop", {"type": "message_stop"}),
+])
+
+# Phase 4 turn: model emits two target JDs as a final text response.
+CHAT_TURN_5 = build_chat_stream([
+    ("message_start", {
+        "type": "message_start",
+        "message": {"id": "msg5", "type": "message", "role": "assistant",
+                    "content": [], "model": "MiniMax-M3",
+                    "stop_reason": None, "stop_sequence": None,
+                    "usage": {"input_tokens": 1000, "output_tokens": 0}}
+    }),
+    ("content_block_start", {
+        "type": "content_block_start", "index": 0,
+        "content_block": {"type": "text", "text": ""}
+    }),
+    ("content_block_delta", {
+        "type": "content_block_delta", "index": 0,
+        "delta": {"type": "text_delta",
+                  "text": "## JD 1: Staff Backend Engineer — Platform Reliability\n\nFor the stagnation-driven slice.\n\n...\n\n## JD 2: Senior Backend Engineer — Cloud Native\n\nFor the remote-priority slice.\n\n..."}
+    }),
+    ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+    ("message_delta", {
+        "type": "message_delta",
+        "delta": {"stop_reason": "end_turn"},
+        "usage": {"input_tokens": 1000, "output_tokens": 1500}
+    }),
+    ("message_stop", {"type": "message_stop"}),
+])
+
 SEARCH_RESPONSE = {
     "organic": [
         {"title": "Senior Software Engineer Salary in Berlin",
@@ -166,7 +265,17 @@ SEARCH_RESPONSE = {
 class MockState:
     chat_calls: list[dict] = []
     search_calls: list[dict] = []
-    _chat_iter = iter([CHAT_TURN_1, CHAT_TURN_2])  # turn 1 then turn 2
+    # _chat_iter is consumed by the agent loop. Each iter of the loop
+    # consumes one entry. The model emits 2 turns per phase that uses
+    # tools (tool_use iter + end_turn iter), and 1 turn for a final
+    # text-only phase.
+    _chat_iter = iter([
+        CHAT_TURN_1,  # Phase 2: tool_use
+        CHAT_TURN_2,  # Phase 2: end_turn (report)
+        CHAT_TURN_3,  # Phase 3: tool_use
+        CHAT_TURN_4,  # Phase 3: end_turn (profile)
+        CHAT_TURN_5,  # Phase 4: end_turn (JDs)
+    ])
 
 
 _orig_stream = httpx.Client.stream
@@ -334,6 +443,79 @@ def main():
     assert has_tool_result, "iter 2 history missing tool_result block"
     print("  ✓ iter 2 message history carries tool_use + tool_result blocks")
 
+    # Multi-turn flow: user says "yes, build the profile", agent does
+    # Phase 3 (2 searches, then final profile). Then user says "proceed
+    # to JDs", agent does Phase 4 (final text, no searches).
+    print("\n=== Second turn: user confirms, agent does Phase 3 (profile) ===")
+    received = []
+    with client.stream("POST", "/api/chat",
+                       json={"session_id": session_id,
+                             "message": "Yes, build the candidate personality profile."}) as r:
+        assert r.status_code == 200
+        for line in r.iter_lines():
+            if not line or not line.startswith("data:"):
+                continue
+            payload = line[len("data:"):].strip()
+            if not payload:
+                continue
+            try:
+                step = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            received.append(step)
+            t = step.get("type")
+            if t == "search_start":
+                print(f"  [search] {step.get('query')!r}")
+            elif t == "message_done":
+                print(f"  [done] {len(step.get('text',''))} chars")
+            elif t == "error":
+                print(f"  [ERROR] {step.get('message')!r}")
+    types = [s["type"] for s in received]
+    # Phase 3 should produce 2 search_start + 2 search_done + text_deltas + message_done
+    assert types.count("search_start") == 2, f"expected 2 searches in Phase 3, got {types.count('search_start')}"
+    assert "message_done" in types
+    print(f"  ✓ Phase 3 ran (2 searches + profile emitted)")
+
+    print("\n=== Third turn: user approves profile, agent does Phase 4 (JDs) ===")
+    received = []
+    with client.stream("POST", "/api/chat",
+                       json={"session_id": session_id,
+                             "message": "Looks good. Now write the targeted job descriptions."}) as r:
+        assert r.status_code == 200
+        for line in r.iter_lines():
+            if not line or not line.startswith("data:"):
+                continue
+            payload = line[len("data:"):].strip()
+            if not payload:
+                continue
+            try:
+                step = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            received.append(step)
+            t = step.get("type")
+            if t == "search_start":
+                print(f"  [search] {step.get('query')!r}")
+            elif t == "message_done":
+                print(f"  [done] {len(step.get('text',''))} chars")
+            elif t == "error":
+                print(f"  [ERROR] {step.get('message')!r}")
+    types = [s["type"] for s in received]
+    # Phase 4 should be a single text response, no searches
+    assert "search_start" not in types, f"Phase 4 should not search, got: {types}"
+    assert "message_done" in types
+    final_jd = next(s for s in received if s["type"] == "message_done")
+    assert "JD" in final_jd.get("text", "") or "job" in final_jd.get("text", "").lower()
+    print(f"  ✓ Phase 4 ran (JDs emitted, no extra searches)")
+
+    # The chat endpoint should have been called 5 times total: 2 each for
+    # Phase 2 and Phase 3, 1 for Phase 4.
+    print(f"\nTotal chat calls: {len(MockState.chat_calls)}")
+    assert len(MockState.chat_calls) == 5, f"expected 5 chat calls, got {len(MockState.chat_calls)}"
+    # And the search endpoint was called 3 times: 1 in Phase 2, 2 in Phase 3.
+    assert len(MockState.search_calls) == 3, f"expected 3 search calls, got {len(MockState.search_calls)}"
+    print(f"  ✓ 5 chat calls, 3 search calls (correct distribution)")
+
     # Session was persisted.
     r = client.get(f"/api/sessions/{session_id}")
     s = r.json()
@@ -341,12 +523,16 @@ def main():
     for m in s["messages"]:
         preview = m["content"][:60].replace("\n", " ")
         print(f"  [{m['role']}] {preview}{'...' if len(m['content']) > 60 else ''}")
-    assert len(s["messages"]) == 2
+    # 3 user turns + 3 assistant turns = 6 messages after the full flow
+    assert len(s["messages"]) == 6
     assert s["messages"][0]["role"] == "user"
     assert s["messages"][1]["role"] == "assistant"
     assert "Berlin" in s["messages"][1]["content"]
     assert "competitive" in s["messages"][1]["content"]
-    print("  ✓ session persisted with user + assistant turns")
+    # Last assistant message is the JDs
+    assert s["messages"][-1]["role"] == "assistant"
+    assert "JD" in s["messages"][-1]["content"] or "job" in s["messages"][-1]["content"].lower()
+    print("  ✓ session persisted with full multi-turn history")
 
     # Rename and delete.
     print("\n=== PATCH /api/sessions/{id} (rename) ===")
