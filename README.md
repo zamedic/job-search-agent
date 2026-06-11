@@ -6,21 +6,61 @@ chat endpoint) plus a custom `web_search` function tool that hits
 MiniMax's `coding_plan/search` endpoint.
 
 The user describes a role they're trying to fill (e.g. "I need a senior
-backend engineer in Berlin, hybrid, Go and Kubernetes"). The agent:
+backend engineer in Berlin, hybrid, Go and Kubernetes"). The agent
+runs four phases, with the last two gated on user confirmation:
 
-1. Asks 2-4 sharp clarifying questions if the brief is vague.
-2. Runs 4-8 web searches via MiniMax to gather current salary data,
-   job board listings, talent-supply indicators, and recent market news.
-3. Delivers a structured report with:
-   - Market summary
-   - Talent availability rating (Easy / Moderate / Hard / Very Hard)
-   - Demand signals
-   - Salary range by seniority, with source URLs and dates
-   - 3-5 live sample job postings
-   - Recommendations
-   - Honest caveats
+**Phase 1 — Clarify.** Asks 2-4 sharp clarifying questions if the brief
+is vague. (Role title, location, seniority, must-have skills,
+employment type, timeline.)
 
-The user can ask follow-ups and the agent will do more targeted research.
+**Phase 2 — Market Research & Report.** Runs 4-8 web searches via MiniMax
+to gather current salary data, job board listings, talent-supply
+indicators, and recent market news. Delivers a structured report:
+- Market summary
+- Talent availability rating (Easy / Moderate / Hard / Very Hard)
+- Demand signals
+- Salary range by seniority, with source URLs and dates
+- 3-5 live sample job postings
+- Recommendations
+- Honest caveats
+
+Ends with a single follow-up question asking whether the user wants
+Phase 3 + 4.
+
+**Phase 3 — Candidate Personality Profile.** Runs only when the user
+confirms. Grounded in 2-4 more web searches for the push factors
+specific to this role/location/year. Delivers:
+- 2-3 sentence framing of who is most likely to be open to a move
+- 5-7 personality traits / motivational drivers, each with the
+  underlying motivation and what it means for how you should talk
+  to them
+- 3-4 anti-personas (people not worth recruiting)
+- Likely objections a JD will need to address upfront
+- A 1-sentence "candidate voice" used by Phase 4
+
+Ends with a follow-up asking whether to proceed to Phase 4, or
+whether the user wants to tweak the profile first (e.g. "focus more
+on remote-first candidates", "drop the career-pivoter slice").
+
+**Phase 4 — Targeted Job Descriptions.** Runs only when the user
+approves the profile. Generates 3-5 JDs, each tuned to a different
+slice of the personality profile. For each JD:
+- A specific working title (not generic)
+- A 1-sentence headline / hook
+- Full job description in board-ready format (intro / what you'll do /
+  what we're looking for / what we offer / how to apply)
+- A 1-2 sentence rationale explaining which personality slice it
+  targets and what trade-off the user is making
+
+Ends with a Posting Strategy note (which boards for which slice, what
+to A/B test, response rate expectations, legal/compliance to watch
+— e.g. EU Pay Transparency Directive).
+
+Phases 1+2 run automatically on the first turn. Phases 3+4 are
+gated — the user can say "yes" / "go ahead" to proceed, or steer
+("focus more on senior folks", "skip the mission-driven slice, we
+already have a values pitch"). The profile can be iterated as many
+times as the user wants before any JDs are written.
 
 ## Architecture
 
@@ -121,9 +161,29 @@ docker run -p 8000:8000 -e MINIMAX_API_KEY=*** \
 - `error` — `{type, message}` — agent failed
 - `end` — terminal marker; the stream is closing
 
+## Sample session
+
+A real 3-turn session against the live MiniMax-M3 endpoint took
+~4 minutes wall-clock and produced:
+
+- **Phase 2 report:** 9,034 chars covering market summary, talent
+  availability, demand signals, salary table by seniority (with 6
+  cited sources), 5 live sample job postings, recommendations, caveats
+- **Phase 3 profile:** 6,961 chars covering the open-to-move pool,
+  4 personality traits (Stagnation-driven, Comp-blocked,
+  Mission-driven, Oncall-burnt) with what each means for messaging,
+  3 anti-personas, 4 likely objections, and a candidate voice
+- **Phase 4 JDs:** 12,996 chars of board-ready JDs (3 of them, each
+  ~500 words) plus a per-JD rationale and a Posting Strategy note
+  with board recommendations, A/B test ideas, response rate
+  expectations, and EU Pay Transparency Directive compliance notes
+
+Total: 10 web searches in Phase 2, 6 in Phase 3, 0 in Phase 4.
+
 ## Testing
 
-Run the end-to-end smoke test (no API key needed; mocks both endpoints):
+Run the end-to-end smoke test (no API key needed; mocks both endpoints
+and scripts the multi-turn Phase 1→2→3→4 flow):
 
 ```bash
 .venv/bin/python -m tests.smoke
