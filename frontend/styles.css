@@ -46,6 +46,11 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Same flex-shrink trick as #chat — let #session-list scroll
+     instead of the whole sidebar. */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #sidebar header {
@@ -149,6 +154,14 @@ button.primary:hover { background: var(--accent-2); }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Fill the 1fr grid column and let the inner #messages section
+     scroll instead of the whole chat panel. min-height:0 is required
+     so flex children can shrink below their content's intrinsic
+     height — without it, #messages overflows the viewport and
+     overflow-y:auto never fires. */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #chat-header {
