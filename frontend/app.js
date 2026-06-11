@@ -233,7 +233,21 @@ function renderSessionList() {
 }
 
 function showWelcome(show) {
-  $("welcome").style.display = show ? "block" : "none";
+  let el = $("welcome");
+  if (show && !el) {
+    // The welcome div lives inside #messages, which openSession wipes
+    // when opening an existing session. Re-create it on demand.
+    el = document.createElement("div");
+    el.id = "welcome";
+    el.className = "welcome";
+    el.innerHTML = `
+      <h2>What role are you trying to fill?</h2>
+      <p>Tell me about a role and a location, and I'll research the market for you.</p>
+      <p class="hint">Example: <em>"I need to hire a senior backend engineer in Berlin, hybrid, Go and Kubernetes."</em></p>
+    `;
+    $("messages").appendChild(el);
+  }
+  if (el) el.style.display = show ? "block" : "none";
 }
 
 function appendMessage(role, contentHtml, opts = {}) {
