@@ -18,6 +18,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install kubectl
+        # The summerwind/actions-runner image doesn't ship kubectl; install
+        # the same version the cluster uses. Matches the labradoc-app pattern.
+        run: |
+          curl -sLo /tmp/kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -35,6 +43,24 @@ jobs:
           docker tag ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }} ghcr.io/zamedic/job-search-agent:latest
           docker push ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }}
           docker push ghcr.io/zamedic/job-search-agent:latest
+
+      - name: Ensure MiniMax API key secret exists in marcarndt namespace
+        # Reads the API key from the repo's GitHub Actions secrets and
+        # upserts it as a k8s secret in the marcarndt namespace. The
+        # deployment's env stanza reads MINIMAX_API_KEY from this secret.
+        # Required secret: MINIMAX_API_KEY (repo or org level).
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+        run: |
+          if [ -z "$MINIMAX_API_KEY" ]; then
+            echo "::error::MINIMAX_API_KEY secret is not set on this repo."
+            echo "Add it at: https://github.com/zamedic/job-search-agent/settings/secrets/actions"
+            exit 1
+          fi
+          kubectl create secret generic job-search-agent-secrets \
+            --namespace=marcarndt \
+            --from-literal=minimax-api-key="$MINIMAX_API_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply manifests
         # First-time install + ongoing reconciliation. Idempotent — applies
