@@ -44,19 +44,18 @@ jobs:
           docker push ghcr.io/zamedic/job-search-agent:${{ steps.image.outputs.sha }}
           docker push ghcr.io/zamedic/job-search-agent:latest
 
-      - name: Apply RBAC first
-        # The runner needs secrets access to upsert the API key. Apply
-        # the role + binding explicitly before anything else so this
-        # step doesn't depend on the secret step succeeding.
-        run: |
-          kubectl apply -f k8s/rbac-role.yaml
-          kubectl apply -f k8s/rbac-binding.yaml
-
       - name: Ensure MiniMax API key secret exists in marcarndt namespace
         # Reads the API key from the repo's GitHub Actions secrets and
         # upserts it as a k8s secret in the marcarndt namespace. The
         # deployment's env stanza reads MINIMAX_API_KEY from this secret.
         # Required secret: MINIMAX_API_KEY (repo or org level).
+        #
+        # NOTE: RBAC for the runner (Role + RoleBinding in the marcarndt
+        # namespace) is bootstrapped manually by the cluster admin, not
+        # by this workflow. The runner cannot apply its own Role because
+        # the binding only takes effect once the role exists. See
+        # k8s/secret-template.md and the README for the bootstrap
+        # commands.
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
         run: |
@@ -70,9 +69,10 @@ jobs:
             --from-literal=minimax-api-key="$MINIMAX_API_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Apply remaining manifests
-        # Deployment, service, PVC, middleware, ingress. RBAC was applied
-        # in the previous step; the secret was just upserted above.
+      - name: Apply application manifests
+        # Deployment, service, PVC, middleware, ingress. The secret was
+        # just upserted above. RBAC is already in place (bootstrapped
+        # manually — see note above).
         run: kubectl apply -k k8s/
 
       - name: Rollout image
