@@ -2,13 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: marcarndt
 
-# Apply order: middleware first (the ingress depends on it), then
-# rbac+pvc+service+deployment, then ingress last.
+# Application manifests only. RBAC (Role + RoleBinding) and the PVC
+# are bootstrapped manually by the cluster admin and intentionally
+# excluded from this kustomization — the runner cannot apply its own
+# Role (the binding only takes effect after the role exists) and we
+# don't want every deploy to re-touch the PVC.
 resources:
-  - middleware.yaml
-  - rbac-role.yaml
-  - rbac-binding.yaml
-  - pvc.yaml
   - service.yaml
   - deployment.yaml
   - ingress.yaml
+  - middleware.yaml
